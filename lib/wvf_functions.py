@@ -85,3 +85,4 @@ def integrate(my_runs,PATH="../data/ana/"):
                     break
             print(RAW[INT_I:INT_F])
             my_runs[run][ch]["Int"][i] = np.trapz(RAW[INT_I:INT_F],x=4e-9*np.arange(len(RAW[INT_I:INT_F])))
+    # TODO: save to .npy file
