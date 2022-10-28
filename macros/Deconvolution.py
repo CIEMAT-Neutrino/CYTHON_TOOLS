@@ -7,7 +7,7 @@ from lib.dec_functions import deconvolve
 
 run = 26
 dec_run = 10
-ch = 0
+ch = 6
 
 my_runs = load_npy([run],[ch])
 dec_runs = load_average_npy([dec_run],[ch])
@@ -18,4 +18,4 @@ OPT = {"LOGY":False}
 # print(dec_runs[10][0].keys())
 # KERNEL = dec_runs["ADC"]
 
-deconvolve(my_runs,dec_runs[dec_run][ch]["ADC"],120,0,OPT)
+deconvolve(my_runs,dec_runs[dec_run][ch]["AvWvf_peak"],120,0,OPT)
