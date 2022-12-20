@@ -21,7 +21,7 @@ from .fig_config import (
     figure_features,
 )  # <--- import customized functions
 
-def vis_npy(my_run, keys, OPT = {}, evt_sel = -1):
+def vis_npy(my_run, keys, OPT = {}, evt_sel = -1, same_plot = False):
     """
     This function is a event visualizer. It plots individual events of a run, indicating the pedestal level, pedestal std and the pedestal calc limit.
     We can interact with the plot and pass through the events freely (go back, jump to a specific event...)
@@ -37,6 +37,7 @@ def vis_npy(my_run, keys, OPT = {}, evt_sel = -1):
             f) CHARGE_KEY: if computed and True, it will show the parametre value
             g) PEAK_FINDER: True if we want to check how many peaks are
         - evt_sel: choose the events we want to see. If -1 all events are displayed, if 0 only uncutted events are displayed, if 1 only cutted events are displayed
+        - same_plot: True if we want to plot different channels in the SAME plot
     """
 
     charge_key = "ChargeAveRange"
@@ -49,13 +50,17 @@ def vis_npy(my_run, keys, OPT = {}, evt_sel = -1):
     ch_list = my_run["NChannel"]
     nch = len(my_run["NChannel"])
     axs = []
-    if nch < 4:
-        fig, ax = plt.subplots(nch ,1, figsize = (10,8))
-        if nch == 1: axs.append(ax)
-        else: axs = ax
+    if same_plot == False:
+        if nch < 4:
+            fig, ax = plt.subplots(nch ,1, figsize = (10,8))
+            if nch == 1: axs.append(ax)
+            else: axs = ax
+        else:
+            fig, ax = plt.subplots(2, math.ceil(nch/2), figsize = (10,8))
+            axs = ax.T.flatten()
     else:
-        fig, ax = plt.subplots(2, math.ceil(nch/2), figsize = (10,8))
-        axs = ax.T.flatten()
+        fig, ax = plt.subplots(1 ,1, figsize = (8,6))
+        axs = ax
 
     for run, key in product(my_run["NRun"],keys):
         idx = 0
@@ -70,7 +75,6 @@ def vis_npy(my_run, keys, OPT = {}, evt_sel = -1):
             
             fig.supxlabel(r'Time [s]')
             fig.supylabel("ADC Counts")
-            fig.tight_layout(h_pad=2) # We avoid small vertical space between plots
             min = []
             raw = []
             norm_raw = [1]*nch # Generates a list with the norm correction for std bar
@@ -95,51 +99,96 @@ def vis_npy(my_run, keys, OPT = {}, evt_sel = -1):
                 if check_key(OPT, "MICRO_SEC") == True and OPT["MICRO_SEC"]==True:
                     fig.supxlabel(r'Time [$\mu$s]')
                     my_run[run][ch_list[j]]["Sampling"] = my_run[run][ch_list[j]]["Sampling"]*1e6
-                
-                if OPT["LOGY"] == True:
-                    axs[j].semilogy()
-                    std = 0 # It is ugly if we see this line in log plots
 
-                axs[j].plot(my_run[run][ch_list[j]]["Sampling"]*np.arange(len(raw[j])),raw[j],label="RAW_WVF", drawstyle = "steps", alpha = 0.95, linewidth=1.2)
-                axs[j].grid(True, alpha = 0.7)
-                axs[j].plot(my_run[run][ch_list[j]]["Sampling"]*np.array([my_run[run][ch_list[j]]["PedLim"],my_run[run][ch_list[j]]["PedLim"]]),np.array([ped+4*std,ped-4*std])/norm_raw[j],c="red",lw=2., alpha = 0.8)
-                axs[j].axhline((ped)/norm_raw[j],c="k",alpha=.55)
-                axs[j].axhline((ped+std)/norm_raw[j],c="k",alpha=.5,ls="--"); axs[j].axhline((ped-std)/norm_raw[j],c="k",alpha=.5,ls="--")
-                axs[j].set_title("Run {} - Ch {} - Event Number {}".format(run,ch_list[j],idx),size = 14)
-                axs[j].xaxis.offsetText.set_fontsize(14) # Smaller fontsize for scientific notation
+                if same_plot == False:
+                    if OPT["LOGY"] == True:
+                        axs[j].semilogy()
+                        std = 0 # It is ugly if we see this line in log plots
+                    fig.tight_layout(h_pad=2) # We avoid small vertical space between plots            
+                    axs[j].plot(my_run[run][ch_list[j]]["Sampling"]*np.arange(len(raw[j])),raw[j],label="RAW_WVF", drawstyle = "steps", alpha = 0.95, linewidth=1.2)
+                    axs[j].grid(True, alpha = 0.7)
+                    axs[j].plot(my_run[run][ch_list[j]]["Sampling"]*np.array([my_run[run][ch_list[j]]["PedLim"],my_run[run][ch_list[j]]["PedLim"]]),np.array([ped+4*std,ped-4*std])/norm_raw[j],c="red",lw=2., alpha = 0.8)
+                    axs[j].axhline((ped)/norm_raw[j],c="k",alpha=.55)
+                    axs[j].axhline((ped+std)/norm_raw[j],c="k",alpha=.5,ls="--"); axs[j].axhline((ped-std)/norm_raw[j],c="k",alpha=.5,ls="--")
+                    axs[j].set_title("Run {} - Ch {} - Event Number {}".format(run,ch_list[j],idx),size = 14)
+                    axs[j].xaxis.offsetText.set_fontsize(14) # Smaller fontsize for scientific notation
+                    
+                    if check_key(OPT, "SHOW_AVE") == True:   
+                        try:
+                            ave_key = OPT["SHOW_AVE"]
+                            ave = my_run[run][ch_list[j]][ave_key][0]
+                            if OPT["NORM"] == True and OPT["NORM"] == True:
+                                ave = ave/np.max(ave)
+                            axs[j].plot(my_run[run][ch_list[j]]["Sampling"]*np.arange(len(ave)),ave,alpha=.5,label="AVE_WVF_%s"%ave_key)             
+                        except:
+                            print("Run has not been averaged!")
 
-            
-                if check_key(OPT, "SHOW_AVE") == True:   
+                    if check_key(OPT, "LEGEND") == True and OPT["LEGEND"]:
+                        axs[j].legend()
+
+                    if OPT["PEAK_FINDER"]:
+                        # These parameters must be modified according to the run...
+                        thresh = my_run[run][ch_list[j]]["PedMax"][idx]
+                        wdth = 4
+                        prom = 0.01
+                        dist  = 40
+                        axs[j].axhline(thresh,c="k", alpha=.6, ls = "dotted")
+                        peak_idx, _ = find_peaks(raw[j], height = thresh, width = wdth, prominence = prom, distance=dist)
+                        for p in peak_idx:
+                            axs[j].scatter(my_run[run][ch_list[j]]["Sampling"]*p,raw[j][p],c="tab:red", alpha = 0.9)
+
                     try:
-                        ave_key = OPT["SHOW_AVE"]
-                        ave = my_run[run][ch_list[j]][ave_key][0]
-                        if OPT["NORM"] == True and OPT["NORM"] == True:
-                            ave = ave/np.max(ave)
-                        axs[j].plot(my_run[run][ch_list[j]]["Sampling"]*np.arange(len(ave)),ave,alpha=.5,label="AVE_WVF_%s"%ave_key)             
-                    except:
-                        print("Run has not been averaged!")
+                        if my_run[run][ch_list[j]]["MyCuts"][idx] == False:
+                            figure_features(tex = False)
+                            axs[j].text(0.5,0.5, s = 'CUT', fontsize = 100, horizontalalignment='center',verticalalignment='center',
+                                        transform = axs[j].transAxes, color = 'red', fontweight = "bold", alpha = 0.5)
+                            figure_features()
+                    except: pass
+                
+                else:
+                    if OPT["LOGY"] == True:
+                        axs.semilogy()
+                        std = 0 # It is ugly if we see this line in log plots
+                    axs.plot(my_run[run][ch_list[j]]["Sampling"]*np.arange(len(raw[j])),raw[j], drawstyle = "steps", alpha = 0.95, linewidth=1.2, label = "Ch {} ({})".format(ch_list[j],my_run[run][ch_list[j]]["Label"]))
+                    axs.grid(True, alpha = 0.7)
+                    axs.plot(my_run[run][ch_list[j]]["Sampling"]*np.array([my_run[run][ch_list[j]]["PedLim"],my_run[run][ch_list[j]]["PedLim"]]),np.array([ped+4*std,ped-4*std])/norm_raw[j],c="red",lw=2., alpha = 0.8)
+                    # axs.axhline((ped)/norm_raw[j],c="k",alpha=.55)
+                    # axs.axhline((ped+std)/norm_raw[j],c="k",alpha=.5,ls="--"); axs.axhline((ped-std)/norm_raw[j],c="k",alpha=.5,ls="--")
+                    axs.set_title("Run {} - Event Number {}".format(run,idx),size = 14)
+                    axs.xaxis.offsetText.set_fontsize(14)
+                    
+                    if check_key(OPT, "SHOW_AVE") == True:   
+                        try:
+                            ave_key = OPT["SHOW_AVE"]
+                            ave = my_run[run][ch_list[j]][ave_key][0]
+                            if OPT["NORM"] == True and OPT["NORM"] == True:
+                                ave = ave/np.max(ave)
+                            axs.plot(my_run[run][ch_list[j]]["Sampling"]*np.arange(len(ave)),ave,alpha=.5,label="AVE_WVF_%s"%ave_key)             
+                        except:
+                            print("Run has not been averaged!")
 
-                if check_key(OPT, "LEGEND") == True and OPT["LEGEND"]:
-                    axs[j].legend()
+                    if check_key(OPT, "LEGEND") == True and OPT["LEGEND"]:
+                        axs.legend()
 
-                if OPT["PEAK_FINDER"]:
-                    # These parameters must be modified according to the run...
-                    thresh = my_run[run][ch_list[j]]["PedMax"][idx]
-                    wdth = 4
-                    prom = 0.01
-                    dist  = 40
-                    peak_idx, _ = find_peaks(raw[j], height = thresh, width = wdth, prominence = prom, distance=dist)
-                    for p in peak_idx:
-                        axs[j].scatter(my_run[run][ch_list[j]]["Sampling"]*p,raw[j][p],c="tab:red", alpha = 0.9)
+                    if OPT["PEAK_FINDER"]:
+                        # These parameters must be modified according to the run...
+                        thresh = my_run[run][ch_list[j]]["PedMax"][idx]
+                        wdth = 4
+                        prom = 0.01
+                        dist  = 40
+                        axs.axhline(thresh,c="k", alpha=.6, ls = "dotted")
+                        peak_idx, _ = find_peaks(raw[j], height = thresh, width = wdth, prominence = prom, distance=dist)
+                        for p in peak_idx:
+                            axs.scatter(my_run[run][ch_list[j]]["Sampling"]*p,raw[j][p],c="tab:red", alpha = 0.9)
 
-                try:
-                    if my_run[run][ch_list[j]]["MyCuts"][idx] == False:
-                        figure_features(tex = False)
-                        axs[j].text(0.5,0.5, s = 'CUT', fontsize = 100, horizontalalignment='center',verticalalignment='center',
-                                    transform = axs[j].transAxes, color = 'red', fontweight = "bold", alpha = 0.5)
-                        figure_features()
-                except: pass
-
+                    try:
+                        if my_run[run][ch_list[j]]["MyCuts"][idx] == False:
+                            figure_features(tex = False)
+                            axs.text(0.5,0.5, s = 'CUT', fontsize = 100, horizontalalignment='center',verticalalignment='center',
+                                        transform = axs.transAxes, color = 'red', fontweight = "bold", alpha = 0.5)
+                            figure_features()
+                    except: pass
+                    
                 if OPT["SHOW_PARAM"] == True:
                     print('\033[1m' + "\nEvent Number {} from RUN_{} CH_{} ({})".format(idx,run,ch_list[j],my_run[run][ch_list[j]]["Label"]) + '\033[0m')
                     print("- Sampling: {:.0E}".format(sampling))
@@ -175,8 +224,10 @@ def vis_npy(my_run, keys, OPT = {}, evt_sel = -1):
             else:
                 idx = idx + 1
             if idx == len(my_run[run][ch_list[j]][key]): break
-            [axs[j].clear() for j in range (nch)]
-        [axs[j].clear() for j in range (nch)]
+            try: [axs[j].clear() for j in range (nch)]
+            except: axs.clear()
+        try: [axs[j].clear() for j in range (nch)];
+        except: axs.clear()
     plt.ioff()
     plt.clf()
 
